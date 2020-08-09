@@ -112,6 +112,7 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.Activity;
+import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
@@ -119,6 +120,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.provider.Browser;
 import android.provider.MediaStore;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
@@ -127,6 +129,8 @@ import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
+import android.webkit.CookieManager;
+import android.webkit.CookieSyncManager;
 import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -143,8 +147,10 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
+import im.delight.android.webview.AdvancedWebView;
+
 public class MainActivity extends AppCompatActivity {
-    WebView webView;
+    AdvancedWebView webView;
     private static final String TAG = MainActivity.class.getSimpleName();
     private String mCM;
     private ValueCallback<Uri> mUM;
@@ -152,6 +158,7 @@ public class MainActivity extends AppCompatActivity {
     private final static int FCR = 1;
     private GoogleApiClient client;
   int   MY_PERMISSIONS_REQUEST_AUDIO =6;
+    String cookies;
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent intent) {
         super.onActivityResult(requestCode, resultCode, intent);
@@ -208,39 +215,55 @@ public class MainActivity extends AppCompatActivity {
                         new String[]{Manifest.permission.RECORD_AUDIO},
                         MY_PERMISSIONS_REQUEST_AUDIO);
             }
-            if (ActivityCompat.shouldShowRequestPermissionRationale(this,
-                    Manifest.permission.CAMERA)) {
-                // Show an expanation to the user *asynchronously* -- don't block
+        }
+
+        if (ContextCompat.checkSelfPermission(this,
+                Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+
+            if (ActivityCompat.shouldShowRequestPermissionRationale((Activity)
+                    this, Manifest.permission.CAMERA)) {
+
+
             } else {
                 ActivityCompat.requestPermissions(this,
                         new String[]{Manifest.permission.CAMERA},
-                        8);
+                        15);
             }
-            if (ActivityCompat.shouldShowRequestPermissionRationale(this,
-                    Manifest.permission.MEDIA_CONTENT_CONTROL)) {
-                // Show an expanation to the user *asynchronously* -- don't block
+
+        }
+        if (ContextCompat.checkSelfPermission(this,
+               Manifest.permission.MEDIA_CONTENT_CONTROL) != PackageManager.PERMISSION_GRANTED) {
+
+            if (ActivityCompat.shouldShowRequestPermissionRationale((Activity)
+                    this, Manifest.permission.MEDIA_CONTENT_CONTROL)) {
+
+
             } else {
                 ActivityCompat.requestPermissions(this,
                         new String[]{Manifest.permission.MEDIA_CONTENT_CONTROL},
-                        9);
+                        16);
             }
-            if (ActivityCompat.shouldShowRequestPermissionRationale(this,
-                    Manifest.permission.ACCESS_MEDIA_LOCATION)) {
-                // Show an expanation to the user *asynchronously* -- don't block
-            } else {
-                ActivityCompat.requestPermissions(this,
-                        new String[]{Manifest.permission.ACCESS_MEDIA_LOCATION},
-                        10);
-            }
-
 
         }
+        if (ContextCompat.checkSelfPermission(this,
+                Manifest.permission.MODIFY_AUDIO_SETTINGS) != PackageManager.PERMISSION_GRANTED) {
 
+            if (ActivityCompat.shouldShowRequestPermissionRationale((Activity)
+                    this, Manifest.permission.MODIFY_AUDIO_SETTINGS)) {
+
+
+            } else {
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.MODIFY_AUDIO_SETTINGS},
+                        18);
+            }
+
+        }
         if (Build.VERSION.SDK_INT >= 23 && (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED)) {
             ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.CAMERA}, 1);
         }
 
-        webView = (WebView) findViewById(R.id.webView);
+        webView = findViewById(R.id.webView);
         assert webView != null;
         WebSettings webSettings = webView.getSettings();
         webSettings.setJavaScriptEnabled(true);
@@ -268,13 +291,13 @@ public class MainActivity extends AppCompatActivity {
                             Uri.parse(url));
                     startActivity(intent);
                 }
-//                else if(url.contains("/join/index.php?id=")){
-//                    Intent i = new Intent(Intent.ACTION_VIEW);
-//                    i.setPackage("com.android.chromium");
-//                    i.setData(Uri.parse(url));
-//
-//                    startActivity(i);
-//                }
+                else if(url.contains("/join/index.php?id=")){
+                    Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                    Bundle bundle = new Bundle();
+
+                    i.putExtra(Browser.EXTRA_HEADERS, bundle);
+                    startActivity(i);
+                }
                 else if(url.startsWith("http:") || url.startsWith("https:")) {
                     view.loadUrl(url);
                 }
@@ -285,6 +308,16 @@ public class MainActivity extends AppCompatActivity {
         webView.getSettings().setPluginState(WebSettings.PluginState.ON_DEMAND);
         webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
         webView.getSettings().setRenderPriority(WebSettings.RenderPriority.HIGH);
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url){
+                cookies = CookieManager.getInstance().getCookie(url);
+                Log.d(TAG, "All the cookies in a string:" + cookies);
+            }
+
+        });
+        webView.getSettings().
+                setUserAgentString("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.117 Safari/537.36");
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             // chromium, enable hardware acceleration
             webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
@@ -295,13 +328,12 @@ public class MainActivity extends AppCompatActivity {
 
        webView.setWebChromeClient(new WebChromeClient() {
 
-           @Override
-           public void onPermissionRequest(PermissionRequest request) {
-               if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                   request.grant(request.getResources());
-               }
-           }
 
+           @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+           @Override
+           public void onPermissionRequest(final PermissionRequest request) {
+               request.grant(request.getResources());
+           }
 
             //For Android 3.0+
             public void openFileChooser(ValueCallback<Uri> uploadMsg) {
